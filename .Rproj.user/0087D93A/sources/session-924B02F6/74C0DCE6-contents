@@ -1,0 +1,271 @@
+# libraries
+library(tidyr)
+library(dplyr)
+library(stringr)
+library(readxl)
+library(stringdist)
+library(tidyverse)
+library(openxlsx)
+library(readr)
+library(scales)
+library(sf)
+library(stargazer)
+library(Hmisc)
+
+sf::sf_use_s2(FALSE)
+
+### assign group
+# Load grouping data
+load("./data/data.RData") # pw, ah, pm
+# load("C:/Users/yohan/Big_data/US Tract/census.Rdata") #tr.sf, st
+
+groups <- read.xlsx("./data/powerplant_grouping.xlsx", fillMergedCells = TRUE) 
+group <- unique(groups$Group)
+
+######################################### Capacity distribution of DAC by indicator in CEJST 
+DAC <- read_csv("../DAC/results/DAC_s.csv")
+
+var <- DAC %>% 
+  dplyr::select(GEOID, disadvantaged:`poverty level`)
+
+nm <- names(var)[-1]
+
+
+data <- data.frame()
+for(i in 1:length(group)){
+  dat <- var %>%
+
+    left_join(pm %>%
+                st_drop_geometry() %>%
+                filter(Group == group[i]) %>%
+                group_by(GEOID) %>%
+                summarise(MW = sum(`Total Nameplate Capacity MW`)), by = "GEOID") %>%
+    mutate_at(c("MW"), ~replace_na(.,0))  # replace NA with 0
+
+
+  da <- data.frame()
+  for(j in 2:(length(colnames(dat))-1)){
+    d <- dat %>%
+      group_by(get(colnames(dat)[j])) %>%
+      summarise(value = sum(MW)) %>%
+      mutate(sum = sum(value),
+             perc = value/sum*100)
+
+    d<- d[2,]
+
+    da <- rbind(d,da)
+
+  }
+
+  da <- da %>%
+    cbind(data.frame(var = rev(colnames(dat))[c(-1,-32)])) %>%
+    mutate(type = group[i])
+
+  data <- rbind(da, data)
+
+}
+
+
+lab <- c("Workforce","Health", "Waster\nwater", "Pollution",
+         "Housing", "Transpor\ntation", "Energy", "Climate")
+
+
+jst <- data %>% 
+  mutate(var = factor(var, levels = nm),
+
+         # type = str_replace_all(type, 
+         #                        c("Natural Gas" = "NG",
+         #                          "Combustion Turbine" = "CT",
+         #                          "Internal Combustion" = "IC",
+         #                          "Steam Turbine" = "ST",
+         #                          "Combined Cycle" = "CC")),
+         
+         class = ifelse(var == nm[1], "total",
+                        ifelse(var %in% nm[27:30], "education", "income")),
+         cat = ifelse(var == nm[1], "Community",
+                      ifelse(var %in% nm[2:6], lab[8], 
+                             ifelse(var %in% nm[7:8], lab[7],
+                                    ifelse(var %in% nm[9:11], lab[6],
+                                           ifelse(var %in% nm[12:15], lab[5],
+                                                  ifelse(var %in% nm[16:20], lab[4],
+                                                         ifelse(var %in% nm[21:22], lab[3],
+                                                                ifelse(var %in% nm[23:26], lab[2], lab[1])))))))),
+         color = cut(perc, breaks = c(0,10,20,27), include.lowest = T),
+         tot = ifelse(class == "total", 60, 27)) 
+
+
+# tp <- jst %>% 
+#   group_by(type, cat) %>% 
+#   mutate(n = n()) %>% 
+#   slice(n())
+
+
+
+
+# library(lemon)
+f1 <- jst %>% 
+  mutate(type = factor(type, levels = c("Coal","Petroleum",
+                                          "NGCC","NGCT","NGIC","NGST",
+                                          "Others","Nuclear","Bio","Hydro",
+                                          "Storage","Batteries",
+                                          "Solar","Wind"))) %>% 
+
+  filter(class == "total") %>% 
+  mutate(var = "     disadvantaged",
+         cat = "Combined\ncommunity") %>% 
+  ggplot() +
+  geom_col(aes(x = tot, y = var), fill = "gray", position = "dodge", width = 0.5) +
+  geom_col(aes(x = perc, y = var),  fill = "gray20", position = "dodge", width = 0.5) +
+
+  labs(x = "", y = "\n\n\n\n\n\n\n", fill = "") + 
+  facet_grid(cat+class ~type, scales = "free", space = "free", switch = "y") +
+  geom_text(aes(x = perc-10, y = 1, label = paste0(round(perc, 0),"%")), 
+            size = 2, color = "white") +
+  
+  theme_classic() +
+  theme(legend.position = "none",
+        strip.text.y = element_text(size = 6))
+
+# cols <- hue_pal()(3)
+f2 <- jst %>% 
+  mutate(type = factor(type, levels = c("Coal","Petroleum",
+                                        "NGCC","NGCT","NGIC","NGST",
+                                        "Others","Nuclear","Bio","Hydro",
+                                        "Storage","Batteries",
+                                        "Solar","Wind"))) %>% 
+  filter(class != "total") %>% 
+  ggplot() +
+  geom_col(aes(x = tot, y = var), fill = "gray", position = "dodge", width = 0.9) +
+  geom_col(aes(x = perc, y = var, fill = color), position = "dodge", width = 0.9) +
+  
+  # geom_text(data = tp, aes(x = 0, y = n + 0.5, label = cat), hjust = 1) +
+  
+  labs(x = "", y = "", fill = "") + 
+  # scale_fill_manual(values = c("56%" = "gray", "Within DAC" = "red")) +
+  # scale_fill_manual(values = rev(cols)) +
+  scale_fill_viridis_d(begin = 0.2, end = 0.95) +
+  facet_grid(cat+class ~type, scales = "free", space = "free", switch = "y") +
+  theme_classic() +
+  theme(legend.position = "bottom",
+        strip.text.y = element_text(size = 6))
+
+library(ggpubr)
+f12 <- ggarrange(f1,f2, nrow = 2, heights = c(0.2,1))
+
+ggsave("./fig/summary/jst.png", f12, width = 17, height = 8, dpi=300)
+
+
+# bt <- data %>% 
+#   filter(type == "Batteries") %>% 
+#   ggplot(aes(x = perc, y = reorder(var, perc))) +
+#   geom_bar(stat="identity") +
+#   labs(title = "Batteries") +
+#   theme_classic()
+# 
+# ggsave("./fig/bt.png", bt, width = 15, height = 5)  
+
+##################################################### Capacity distribution by DAC scores 
+
+dac <- DAC %>% 
+  dplyr::select(GEOID, DACSCORE)
+
+tr.sf %>% 
+  right_join(dac, by = c("FIPS" = "GEOID")) %>% 
+  filter(is.na(DACSCORE)) %>% 
+  ggplot()+
+  geom_sf(aes(fill = DACSCORE)) +
+  theme_minimal() +
+  coord_sf(crs = st_crs(2163), xlim = c(-2500000, 2700000), 
+           ylim = c(-2300000,730000), expand = FALSE, datum = NA) +
+  guides(fill = guide_legend(order = 1),
+         color = guide_legend(order = 2), 
+         size = guide_legend(order = 3))
+  
+### bar chart
+da <- data.frame()
+for(i in 1:length(group)){
+  d <- dac %>% 
+    left_join(pm %>% 
+                st_drop_geometry() %>% 
+                filter(Group == group[i]) %>% 
+                group_by(GEOID) %>% 
+                summarise(MW = sum(`Total Nameplate Capacity MW`)), by = "GEOID") %>% 
+    mutate_at(c("MW"), ~replace_na(., 0)) %>% 
+    mutate(DACSCORE = round(DACSCORE)) %>% 
+    filter(!is.na(DACSCORE)) %>% 
+    mutate(weight = DACSCORE*MW/sum(MW)) %>% 
+    group_by(DACSCORE) %>% 
+    summarise(sum = sum(MW)/1000,
+              avg = sum(weight)) %>% 
+    mutate(type = group[i],
+           avg = sum(avg)) 
+  
+  da <- rbind(d, da)
+}
+
+
+bar <- da %>% 
+  # mutate(type = str_replace_all(type, 
+  #                               c("Natural Gas" = "NG",
+  #                                 "Combustion Turbine" = "CT",
+  #                                 "Internal Combustion" = "IC",
+  #                                 "Steam Turbine" = "ST",
+  #                                 "Combined Cycle" = "CC"))) %>% 
+  mutate(type = factor(type, levels = unique(da$type)[c(4,14,13,12,11,10,9,5,3,2,7,6,8,1)])) %>% 
+  ggplot(aes(x = DACSCORE, y = sum)) +
+  
+  geom_bar(stat = "identity", fill = "gray90") +
+  geom_density(stat = "identity", alpha = 0.3, color = "gray20") +
+
+  geom_vline(aes(xintercept = avg, color = "Capacity\nWeighted mean"), linetype = 2) +
+  geom_vline(aes(xintercept = mean(dac$DACSCORE, na.rm = T),color = "National mean"), linetype = 2) +
+  labs(y = "Capacity (GW)", x = "DAC Score", fill = "", color = "") +
+  facet_wrap(~type, scales = "free") +
+  scale_color_manual(values = c("Capacity\nWeighted mean" = "red",
+                                "National mean" = "blue")) +
+  theme_classic() +
+  theme(axis.line.x = element_line(color="black"),
+        axis.line.y = element_line(color="black"),
+        text = element_text(size = 11.5),
+        strip.text.x = element_text(size = 12),
+        legend.position = c(0.8, 0.1)) 
+
+ggsave("./fig/summary/bar.png", bar, width = 10, height = 5, dpi=300)
+
+
+# ### supply curve
+# da <- data.frame()
+# for(i in 1:length(group)){
+#   d <- dac %>% 
+#     st_drop_geometry() %>% 
+#     left_join(pm %>% 
+#                 st_drop_geometry() %>% 
+#                 filter(Group == group[i]) %>% 
+#                 group_by(GEOID) %>% 
+#                 summarise(MW = sum(`Total Nameplate Capacity MW`)), by = "GEOID") %>% 
+#     mutate_at(c("MW"), ~replace_na(., 0)) %>% 
+#     filter(!is.na(DACSCORE)) %>% 
+#     arrange(desc(DACSCORE)) %>%
+#     mutate(sum = cumsum(MW)/1000,
+#            type = group[i]) 
+#   
+#   da <- rbind(d, da)
+# }
+# 
+# 
+# supply <- da %>% 
+#   ggplot(aes(x = sum, y = DACSCORE, color = type)) +
+#   geom_line() +
+#   # geom_bar(stat = "identity") +
+#   labs(x = "Cumulative capacity (TW)", y = "DAC Score", color = "") +
+#   theme_minimal() +
+#   theme(legend.position = "bottom",
+#         axis.line.x = element_line(color="black"),
+#         axis.line.y = element_line(color="black"),
+#         text = element_text(size = 11.5),
+#         strip.text.x = element_text(size = 12)) 
+# 
+# ggsave("./Fig/supply.png", supply, width = 10, height = 5, dpi=300)
+
+
+

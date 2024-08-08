@@ -1,0 +1,236 @@
+source("./syntax/Data.R")
+ggsave <- function(..., bg = 'white') ggplot2::ggsave(..., bg = bg)
+
+# source: ACS 2021; EPA EJ screening Tool; EIA 2021
+# pw: donut shape weighted demo features by buffer
+# ah: host identification for plant by buffer size with dis joined
+# pm: plant mapping
+load("./data/data.RData")
+
+
+group <- c("Coal","Petroleum",
+           "NGCC","NGCT","NGIC","NGST",
+           "Others","Nuclear","Bio","Hydro",
+           "Storage","Batteries",
+           "Solar","Wind")
+
+
+# donut
+for(i in 1:length(group)){
+  
+  plot <- pw %>% 
+    mutate(BUFF_DIST = as.character(BUFF_DIST)) %>% 
+    gather(key = "variable", value = "value", POPDEN:OVER64) %>% 
+    filter(Group == group[i]) %>% 
+    ggplot(aes(x = BUFF_DIST, y = value)) +
+    geom_boxplot() +
+    facet_wrap(~variable, ncol = 4, scales = "free") +
+    labs(x = "Buffer", y = "Value", title = group[i]) +
+    theme_bw() +
+    theme(plot.title = element_text(hjust = 0.5)) # Center the title
+  
+  ggsave(paste0("./fig/donut/", group[i], ".png"), plot, width = 10, height = 7)
+  
+}
+
+
+# tract box
+for(i in 1:length(group)){
+  plot <- ah %>% 
+    filter(Area == "Tract") %>% 
+    dplyr::select(- Area) %>% 
+    drop_na() %>% 
+    mutate(POPDEN = log(POPDEN)) %>% 
+    
+    filter(Group == group[i]) %>% 
+    dplyr::select(Group, Host, Buff, relevant_variables_demographics) %>% 
+    mutate(Buff = as.character(Buff)) %>% 
+    gather(key = "variable", value = "value", POPDEN:LESSHS) %>% 
+    
+    ggplot(aes(x = Buff, y = value, color = Host)) +
+    geom_boxplot(outlier.shape = NA) +
+    facet_wrap(~variable, ncol = 4, scales = "free") +
+    labs(x = "Buffer", y = "Value", title = group[i]) +
+    theme_bw() +
+    theme(plot.title = element_text(hjust = 0.5),
+          legend.position = "bottom") # Center the title
+  
+  ggsave(paste0("./fig/host/", group[i], ".png"), plot, width = 10, height = 7)
+  
+}
+
+# county box
+for(i in 1:length(group)){
+  plot <- ah %>% 
+    filter(Area == "County") %>% 
+    dplyr::select(- Area) %>% 
+    drop_na() %>% 
+    mutate(POPDEN = log(POPDEN)) %>% 
+    
+    filter(Group == group[i]) %>% 
+    dplyr::select(Group, Host, Buff, relevant_variables_demographics) %>% 
+    mutate(Buff = as.character(Buff)) %>% 
+    gather(key = "variable", value = "value", POPDEN:LESSHS) %>% 
+    ggplot(aes(x = Buff, y = value, color = Host)) +
+    geom_boxplot(outlier.shape = NA) +
+    facet_wrap(~variable, ncol = 4, scales = "free") +
+    labs(x = "Buffer", y = "Value", title = group[i]) +
+    theme_bw() +
+    theme(plot.title = element_text(hjust = 0.5),
+          legend.position = "bottom") # Center the title
+  
+  ggsave(paste0("./fig/host/county/", group[i], ".png"), plot, width = 10, height = 7)
+  
+}
+
+# regression
+d <- data.frame()
+area <- c("Tract","County")
+buffers = rev(c("0", "1", "3"))
+vrn <- c("LOWINCOME","LESSHS","UNEMPLOYED","PEOPCOLOR","LINGISO","OVER64","UNDER5","POPDEN")
+
+for(i in 1:length(group)){
+  for(k in 1:2){
+    for(j in 1:length(buffers)){
+      for(m in 3:8){
+        
+        vr = vrn[1:m]
+        
+        # Create the formula dynamically
+        mod <- as.formula(paste("Host ~", paste(vr, collapse = " + ")))
+        
+        dat <- ah %>% 
+          filter(population > 0) %>% 
+          filter(Area == area[k]) %>%
+          filter(Buff == buffers[j]) %>%
+          filter(Group == group[i]) %>%
+          dplyr::select(relevant_variables_demographics, Host) %>%
+          mutate(Host = ifelse(Host == "N", 0, 1),
+                 POPDEN = log(POPDEN))
+        
+        
+        fit <- glm(mod, family = binomial(link="logit"), data = dat)
+        
+        dat <- summary(fit)$coefficients %>% 
+          as.data.frame() %>% 
+          mutate(color = ifelse(`Pr(>|z|)` < 0.05, "Y", "N")) %>%
+          dplyr::select(-"z value",-"Pr(>|z|)") %>% 
+          tibble::rownames_to_column("var") %>% 
+          filter(!var == "(Intercept)") %>% 
+          rename(se = "Std. Error",
+                 pe = Estimate) %>% 
+          mutate(Group = group[i],
+                 Buffer = buffers[j],
+                 Area = area[k],
+                 var = factor(var, levels = c(relevant_variables_demographics)),
+                 model = paste0("Model",m-2))
+        
+        d <- rbind(dat, d)
+        
+        
+      }
+      
+    }
+  }
+  
+  plt <- d %>% 
+    mutate(Area = factor(Area, levels = area),
+           color = factor(color, levels = c("Y", "N")),
+           var = factor(var, levels = vrn)) %>% 
+    filter(Group == group[i]) %>% 
+    
+    # ggplot(aes(y = exp(pe), x = reorder(var, pe), group = var)) +
+    # geom_errorbar(aes(ymin=exp(pe-1.96*se), ymax=exp(pe+1.96*se)),width = 0.1, size = 0.7) +
+    # geom_point(aes(color = color), size = 2.8) +
+    # geom_hline(yintercept = 1,linetype = "dotted", size = 1) +
+    # # coord_flip(ylim = c(10^-25, 10^25)) +
+    # coord_flip() +
+    # scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+    #               labels = trans_format("log10", math_format(10^.x))) +
+    # labs(x = "Variable", y ="Odds ratio", 
+    #      title = paste0(group[i])) +
+    # scale_color_manual(values = c("N" = "grey", "Y" = "red"), 
+    #                    # labels = c("N","Y"),
+    #                    name = "Significance") +
+    # facet_grid(Area ~ Buffer, scales = "free") +
+    # theme_minimal() +
+    # theme(panel.border = element_rect(color = "black", fill = NA),
+    #       legend.position = "bottom")
+  
+    ggplot(aes(y = exp(pe), x = var)) +
+      geom_hline(yintercept = 1,linetype = "dashed", size = 0.5, color = "gray30") +
+      geom_errorbar(aes(ymin=exp(pe-1.96*se), ymax=exp(pe+1.96*se)),color="gray50") +
+      geom_point(aes(fill = color),size = 2, color = "black",pch=21) +
+      
+      # geom_text(data = tp, aes(x = 0, y = n + 0.5, label = cat), hjust = 1) +
+      coord_flip() +
+      theme_bw() +
+      scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                    labels = trans_format("log10", math_format(10^.x))) +
+      labs(x = "", y ="Odds ratio", 
+           title = group[i]) +
+
+      facet_grid(Area+Buffer ~model, scales = "free") +
+      scale_fill_manual(values=c("orange", "gray")) +
+      theme(panel.grid.minor = element_blank(),
+            panel.grid.major.x = element_blank(),
+            strip.background =element_rect(fill="gray22",color="gray22"),
+            strip.text = element_text(color = 'white',family="Franklin Gothic Book",size=12),
+            legend.position = "none",
+            axis.text.x = element_text(color = "black",family="Franklin Gothic Book",size=6),
+            axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=9),
+            axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=11),
+            plot.title=element_text(family="Franklin Gothic Demi", size=20)) 
+  
+  ggsave(paste0("./fig/regression/", group[i], ".png"), 
+         plt, width = 10, height = 7)
+  
+}
+
+
+# mapping
+for(i in 1:length(group)){
+  map <- pm %>% 
+    filter(Group == group[i]) %>% 
+    # mutate(IV = ifelse(LOWINCOME > 0.38, 1, 0), 
+    #        RV = ifelse(LESSHS > 0.1, 1, 0), 
+    #        IR = ifelse(IV == 1 & RV == 1, "HH",
+    #                    ifelse(IV == 1 & RV == 0, "HL",
+    #                           ifelse(IV == 0 & RV == 1, "LH","LL"))),
+    #        IR = factor(IR, levels = c("LL","LH","HL","HH"))) %>% 
+    
+    left_join(dis %>% 
+                st_drop_geometry(), by = "GEOID") %>% 
+    # filter(!is.na(IR)) %>% 
+    filter(!is.na(disadvantaged)) %>% 
+    
+    mutate(disadvantaged = ifelse(disadvantaged == "TRUE", "Disadvantaged community", 
+                                  "Not disadvantaged community")) %>% 
+    
+    
+    
+    ggplot() +
+    geom_sf(data = st, fill = "gray95", color = "gray60", size = 0.1) +
+    geom_sf(shape = 21, alpha = 0.7, aes(fill = disadvantaged, 
+                                         size = `Total Nameplate Capacity MW`/1000)) +
+    # scale_fill_manual(values = c(HH = "red",HL = "green",LH = "blue",LL = "white")) +
+    scale_fill_viridis_d(direction = -1) +
+    
+    scale_color_manual(values = c("black","white")) + 
+    scale_shape_manual(values = c(21,22)) +
+    labs(fill = "", 
+         color = "",
+         size = "Capacity (GW)",
+         title = group[i]) +
+    theme_minimal() +
+    coord_sf(crs = st_crs(2163), xlim = c(-2500000, 2700000), 
+             ylim = c(-2300000,730000), expand = FALSE, datum = NA) +
+    guides(fill = guide_legend(order = 1),
+           color = guide_legend(order = 2), 
+           size = guide_legend(order = 3))
+  
+  ggsave(paste0("./fig/map/", group[i], ".png"), map, width = 10, height = 5)
+  
+}
+
+
