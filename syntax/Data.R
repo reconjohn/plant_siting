@@ -19,7 +19,15 @@ library(purrr)
 sf::sf_use_s2(FALSE)
 ggsave <- function(..., bg = 'white') ggplot2::ggsave(..., bg = bg)
 
-load("C:/Users/yohan/Big_data/US Tract/census.Rdata") #tr.sf, st
+
+tr.sf <- get_acs(
+  geography = "tract",
+  variables = "B01003_001",  # Total population
+  state = state_code,
+  year = year,
+  geometry = geometry
+)
+
 
 ### DAC
 DAC <- read_csv("https://github.com/reconjohn/disadvantaged_communities/raw/main/results/DAC_s.csv")
