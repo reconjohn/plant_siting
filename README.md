@@ -21,8 +21,8 @@ Please cite as:
 
 ## Data Descriptions
 
-### 1. `tr_sf.Rdata`
-- Contains geospatial data at the census tract level, identified by GEOID.
+### 1. `tr.sf`
+- Contains geospatial data directly downloaded from the U.S. census at the census tract level, identified by GEOID. 
 
 ### 2. `demographic_df_feats_tract.csv`
 - Sociodemographic data from ACS 2021 for each census tract.
