@@ -15,10 +15,18 @@ library(ggpubr)
 library(mapview)
 library(leafsync)
 library(purrr)
+library(tidycensus)
 
 sf::sf_use_s2(FALSE)
 ggsave <- function(..., bg = 'white') ggplot2::ggsave(..., bg = bg)
 
+
+
+state_lookup <- data.frame(
+  state_name = state.name,
+  STATE_ABBR = state.abb,
+  stringsAsFactors = FALSE
+)
 
 all_states <- unique(fips_codes$state)[1:51]  # Excludes territories
 
@@ -35,7 +43,9 @@ tr.sf <- map_df(all_states, function(state_code) {
     year = year,
     geometry = geometry
   )
-})
+}) %>% 
+  mutate(state = word(NAME, -1)) %>% 
+  left_join(state_lookup, by = c("state" = "state_name"))
 
 
 ### DAC
