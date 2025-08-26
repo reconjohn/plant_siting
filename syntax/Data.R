@@ -20,13 +20,22 @@ sf::sf_use_s2(FALSE)
 ggsave <- function(..., bg = 'white') ggplot2::ggsave(..., bg = bg)
 
 
-tr.sf <- get_acs(
-  geography = "tract",
-  variables = "B01003_001",  # Total population
-  state = state_code,
-  year = year,
-  geometry = geometry
-)
+all_states <- unique(fips_codes$state)[1:51]  # Excludes territories
+
+# Set parameters
+year <- 2021
+geometry <- TRUE
+
+# Pull ACS data for all states and bind into one sf object
+tr.sf <- map_df(all_states, function(state_code) {
+  get_acs(
+    geography = "tract",
+    variables = "B01003_001",  # Total population
+    state = state_code,
+    year = year,
+    geometry = geometry
+  )
+})
 
 
 ### DAC
