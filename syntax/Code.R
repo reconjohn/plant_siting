@@ -5,7 +5,7 @@ ggsave <- function(..., bg = 'white') ggplot2::ggsave(..., bg = bg)
 dac_portion <- dis1 %>% 
   st_drop_geometry() %>%
   group_by(disadvantaged) %>%
-  summarise(count = sum(POPULATION)) %>%
+  summarise(count = sum(estimate)) %>%
   mutate(sum = sum(count)) %>%
   mutate(rate = count/sum*100) %>% 
   pull(rate)
@@ -354,7 +354,7 @@ ggsave("./fig/jst_com.png", f2, width = 13, height = 7, dpi=300)
 var_mean <- demo %>% 
   gather(key, value, POPDEN:OVER64) %>% 
   group_by(key) %>% 
-  summarise(value = weighted.mean(value, population, rm.na = T))
+  summarise(value = weighted.mean(value, estimate, rm.na = T))
 
 avg <- rbind(data.frame("Group" = rep("Average", 6*8),
                         "BUFF_DIST" = rep(c("0.25","0.5","1","2","3","5"), 8),
@@ -372,7 +372,7 @@ avg <- rbind(data.frame("Group" = rep("Average", 6*8),
                                            ifelse(var == "UNEMPLOYED", "Unemployed (%)",
                                                   ifelse(var == "UNDER5", "Under 5\nyears old (%)",
                                                          ifelse(var == "OVER64", "Over 64\nyears old (%)",
-                                                                "Population\ndensity\n(100 ppsm)"))))))),
+                                                                "estimate\ndensity\n(100 ppsm)"))))))),
          var = factor(var, levels = vec)) %>% 
   filter(BUFF_DIST != "0.25")
 
@@ -414,7 +414,7 @@ plot1 <- pw %>%
                                            ifelse(var == "UNEMPLOYED", "Unemployed (%)",
                                                   ifelse(var == "UNDER5", "Under 5\nyears old (%)",
                                                          ifelse(var == "OVER64", "Over 64\nyears old (%)",
-                                                                "Population\ndensity\n(100 ppsm)"))))))),
+                                                                "estimate\ndensity\n(100 ppsm)"))))))),
          var = factor(var, levels = vec)) %>%
   
   filter(Group != "Others") %>% 
@@ -467,7 +467,7 @@ plot2 <- pw %>%
                                            ifelse(var == "UNEMPLOYED", "Unemployed (%)",
                                                   ifelse(var == "UNDER5", "Under 5\nyears old (%)",
                                                          ifelse(var == "OVER64", "Over 64\nyears old (%)",
-                                                                "Population\ndensity\n(100 ppsm)"))))))),
+                                                                "estimate\ndensity\n(100 ppsm)"))))))),
          var = factor(var, levels = vec)) %>%
   
   filter(Group != "Others") %>% 
@@ -518,7 +518,7 @@ plot_s <- pw_s %>%
                                            ifelse(var == "UNEMPLOYED", "Unemployed (%)",
                                                   ifelse(var == "UNDER5", "Under 5\nyears old (%)",
                                                          ifelse(var == "OVER64", "Over 64\nyears old (%)",
-                                                                "Population\ndensity\n(100 ppsm)"))))))),
+                                                                "estimate\ndensity\n(100 ppsm)"))))))),
          var = factor(var, levels = vec)) %>%
   filter(Group != "Not Available") %>% 
   filter(BUFF_DIST != "0.25") %>% 
@@ -568,7 +568,7 @@ plot_tl <- tl_d %>%
                                            ifelse(var == "UNEMPLOYED", "Unemployed (%)",
                                                   ifelse(var == "UNDER5", "Under 5\nyears old (%)",
                                                          ifelse(var == "OVER64", "Over 64\nyears old (%)",
-                                                                "Population\ndensity\n(100 ppsm)"))))))),
+                                                                "estimate\ndensity\n(100 ppsm)"))))))),
          var = factor(var, levels = vec)) %>%
   filter(Group != "Not Available") %>% 
   filter(buff != "0.25") %>% 
@@ -609,36 +609,36 @@ ggsave("./fig/donut.png", plot, width = 12, height = 12, dpi = 300)
 ### f4
 # combine NG
 # combine voltate
-plot <- ah %>% # population weighted mean
-  filter(population > 0) %>% 
+plot <- ah %>% # estimate weighted mean
+  filter(estimate > 0) %>% 
   # drop_na() %>% 
   # mutate(POPDEN = rescale(POPDEN)) %>%
-  dplyr::select(population, Area, Group, Host, Buff, relevant_variables_demographics) %>% 
+  dplyr::select(estimate, Area, Group, Host, Buff, relevant_variables_demographics) %>% 
   mutate(Buff = as.character(Buff)) %>% 
   gather(key = "var", value = "value", LOWINCOME:POPDEN) %>% 
   group_by(Area, Group,Host,Buff, var) %>% 
-  dplyr::summarise(mean = weighted.mean(value, population, rm.na = T)) %>% 
+  dplyr::summarise(mean = weighted.mean(value, estimate, rm.na = T)) %>% 
   
   rbind(ah_s %>% 
-          filter(population > 0) %>% 
+          filter(estimate > 0) %>% 
           
           # drop_na() %>% 
           # mutate(POPDEN = rescale(POPDEN)) %>%
-          dplyr::select(population, Area, Host, Buff, relevant_variables_demographics) %>% 
+          dplyr::select(estimate, Area, Host, Buff, relevant_variables_demographics) %>% 
           mutate(Buff = as.character(Buff)) %>% 
           gather(key = "var", value = "value", LOWINCOME:POPDEN) %>% 
           group_by(Area,Host,Buff, var) %>% 
-          summarise(mean = weighted.mean(value, population, rm.na = T)) %>% 
+          summarise(mean = weighted.mean(value, estimate, rm.na = T)) %>% 
           mutate(Group = "Substations") %>% 
           dplyr::select(Area,Group,Host,Buff,var,mean)) %>% 
   
   rbind(ah_t %>% 
-          filter(population > 0) %>% 
-          dplyr::select(population, Area, Host, Buff, relevant_variables_demographics) %>% 
+          filter(estimate > 0) %>% 
+          dplyr::select(estimate, Area, Host, Buff, relevant_variables_demographics) %>% 
           mutate(Buff = as.character(Buff)) %>% 
           gather(key = "var", value = "value", LOWINCOME:POPDEN) %>% 
           group_by(Area,Host,Buff, var) %>% 
-          summarise(mean = weighted.mean(value, population, rm.na = T)) %>% 
+          summarise(mean = weighted.mean(value, estimate, rm.na = T)) %>% 
           mutate(Group = "Transmission")) %>% 
   
   
@@ -654,7 +654,7 @@ plot <- ah %>% # population weighted mean
                                            ifelse(var == "UNEMPLOYED", "Unemployed (%)",
                                                   ifelse(var == "UNDER5", "Under 5\nyears old (%)",
                                                          ifelse(var == "OVER64", "Over 64\nyears old (%)",
-                                                                "Population\ndensity\n(100 ppsm)"))))))),
+                                                                "estimate\ndensity\n(100 ppsm)"))))))),
          var = factor(var, levels = vec)) %>%
   mutate(Host = ifelse(Host == "Y", "Host community", "Non-host community"),
          Area = ifelse(Area == "Tract", "Census tract", Area),
@@ -706,6 +706,7 @@ for(i in 1:length(group)){
     }
   }
 }
+
 
 rg_t <- TP %>%
   filter(Buffer != "1") %>% 

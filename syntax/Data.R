@@ -16,6 +16,7 @@ library(mapview)
 library(leafsync)
 library(purrr)
 library(tidycensus)
+library(caret)
 
 sf::sf_use_s2(FALSE)
 ggsave <- function(..., bg = 'white') ggplot2::ggsave(..., bg = bg)
@@ -48,21 +49,26 @@ tr.sf <- map_df(all_states, function(state_code) {
   left_join(state_lookup, by = c("state" = "state_name"))
 
 
+st <- tr.sf %>% 
+  group_by(state) %>% 
+  summarise(geometry = st_union(geometry))
+
+
 ### DAC
 DAC <- read_csv("https://github.com/reconjohn/disadvantaged_communities/raw/main/results/DAC_s.csv")
 
 # DAC spatial
 dis <- tr.sf %>% 
   filter(!STATE_ABBR %in% c("AK","HI")) %>% 
-  rename(GEOID = FIPS) %>% 
+  # rename(GEOID = FIPS) %>% 
   dplyr::select(GEOID) %>% 
   left_join(DAC %>% 
               dplyr::select(GEOID, disadvantaged), by = "GEOID") 
 
 dis1 <- tr.sf %>% 
   filter(!STATE_ABBR %in% c("AK","HI")) %>% 
-  rename(GEOID = FIPS) %>% 
-  dplyr::select(GEOID, POPULATION) %>% 
+  # rename(GEOID = FIPS) %>% 
+  dplyr::select(GEOID, estimate) %>% 
   left_join(DAC %>% 
               dplyr::select(GEOID, disadvantaged), by = "GEOID") 
 
@@ -129,7 +135,7 @@ demo_c <- read_csv("./data/demographic_df_feats_county.csv") %>%
 
 # for mapping
 dem_m <- tr.sf %>% 
-  dplyr::rename(GEOID = FIPS) %>% 
+  # dplyr::rename(GEOID = FIPS) %>% 
   dplyr::select(GEOID) %>% 
   left_join(demo, by = "GEOID") %>% 
   dplyr::select(GEOID,population, relevant_variables_demographics)
@@ -154,17 +160,17 @@ group_t <- c("Not Available","Under 100 kV","100-161 kV","220-287 kV",
 # pm: plant mapping
 load("./data/data.RData")
 pw <- pw %>% 
-  mutate(Group = ifelse(Group %in% c("NG"), "Natural Gas", Group)) %>% 
+  mutate(Group = ifelse(substr(Group, 1, 2) == "NG", "Natural Gas", Group)) %>% 
   mutate(Group = ifelse(Group == "Bio", "Biomass", 
                         ifelse(Group == "Hydro", "Hydroelectric", 
                                ifelse(Group == "Petroleum", "Oil", Group)))) 
 ah <- ah %>% 
-  mutate(Group = ifelse(Group %in% c("NG"), "Natural Gas", Group)) %>% 
+  mutate(Group = ifelse(substr(Group, 1, 2) == "NG", "Natural Gas", Group)) %>% 
   mutate(Group = ifelse(Group == "Bio", "Biomass", 
                         ifelse(Group == "Hydro", "Hydroelectric", 
                                ifelse(Group == "Petroleum", "Oil", Group)))) 
 pm <- pm %>% 
-  mutate(Group = ifelse(Group %in% c("NG"), "Natural Gas", Group)) %>% 
+  mutate(Group = ifelse(substr(Group, 1, 2) == "NG", "Natural Gas", Group)) %>% 
   mutate(Group = ifelse(Group == "Bio", "Biomass", 
                         ifelse(Group == "Hydro", "Hydroelectric", 
                                ifelse(Group == "Petroleum", "Oil", Group))))
@@ -172,10 +178,11 @@ pm <- pm %>%
 # pw_s: donut shape weighted demo features by buffer
 # ah_s: host identification for plant by buffer size with dis joined
 # pm_s: plant mapping
+
 load("./data/data_s.RData")
-load("./data/derived/TL.RData") # tl_d, ah_t
+load("./data/TL.RData") # tl_d, ah_t
 tl_d <- tl_d %>% 
-  dplyr::select(GEOID:Group) %>% 
+  dplyr::select(GEOID:buff,Group) %>% 
   mutate(Group = ifelse(Group == "Under 100kV", "Under 100 kV",
                         ifelse(Group == "100-161kV", "100-161 kV",
                                ifelse(Group == "220-287kV", "220-287 kV",
@@ -197,7 +204,7 @@ ah_t <- ah_t %>%
 
 
 # transmission lines
-tl <- st_read("../../Publication/Common_data/TL/TL.shp")%>% 
+tl <- st_read("./data/TL.shp")%>% 
   rename(Group = VOLT_CLASS) %>%
   mutate(Group = ifelse(Group == "NOT AVAILABLE", "Not Available",
                         ifelse(Group == "UNDER 100", "Under 100 kV", 

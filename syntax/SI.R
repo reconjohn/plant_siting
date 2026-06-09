@@ -511,6 +511,7 @@ for(i in 1:length(group_g)){
     }
   }
   
+  
   plt <- d %>% 
     mutate(Area = factor(Area, levels = area),
            color = factor(color, levels = c("Y", "N")),
@@ -542,13 +543,15 @@ for(i in 1:length(group_g)){
           axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=12),
           plot.title=element_text(family="Franklin Gothic Demi", size=20)) 
   
-  ggsave(paste0("./fig/regression/", group_g[i], ".png"), 
-         plt, width = 10, height = 7)
+  # ggsave(paste0("./fig/regression/", group_g[i], ".png"), 
+  #        plt, width = 10, height = 7)
   
 }
 
+
+
 ### substation
-d <- data.frame()
+ds <- data.frame()
 for(i in 1:length(group_s)){
   for(k in 1:2){
     for(j in 1:length(buffers)){
@@ -587,14 +590,14 @@ for(i in 1:length(group_s)){
                  var = factor(var, levels = c(relevant_variables_demographics)),
                  model = paste0("Model ",m))
         
-        d <- rbind(dat, d)
+        ds <- rbind(dat, ds)
         
       }
       
     }
   }
   
-  plt <- d %>% 
+  plt <- ds %>% 
     mutate(Area = factor(Area, levels = area),
            color = factor(color, levels = c("Y", "N")),
            var = factor(var, levels = vrn)) %>% 
@@ -625,14 +628,15 @@ for(i in 1:length(group_s)){
           axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=12),
           plot.title=element_text(family="Franklin Gothic Demi", size=20)) 
   
-  ggsave(paste0("./fig/regression/S", group_s[i], ".png"), 
-         plt, width = 10, height = 7)
+  # ggsave(paste0("./fig/regression/S", group_s[i], ".png"), 
+  #        plt, width = 10, height = 7)
   
 }
 
 
+
 ### transmission
-d <- data.frame()
+dt <- data.frame()
 for(i in 1:length(group_t)){
   for(k in 1:2){
     for(j in 1:length(buffers)){
@@ -671,14 +675,14 @@ for(i in 1:length(group_t)){
                  var = factor(var, levels = c(relevant_variables_demographics)),
                  model = paste0("Model ",m))
         
-        d <- rbind(dat, d)
+        dt <- rbind(dat, dt)
         
       }
       
     }
   }
   
-  plt <- d %>% 
+  plt <- dt %>% 
     mutate(Area = factor(Area, levels = area),
            color = factor(color, levels = c("Y", "N")),
            var = factor(var, levels = vrn)) %>% 
@@ -709,10 +713,264 @@ for(i in 1:length(group_t)){
           axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=12),
           plot.title=element_text(family="Franklin Gothic Demi", size=20)) 
   
-  ggsave(paste0("./fig/regression/T", group_t[i], ".png"), 
-         plt, width = 10, height = 7)
+  # ggsave(paste0("./fig/regression/T", group_t[i], ".png"), 
+  #        plt, width = 10, height = 7)
   
 }
+
+
+### Additional for table
+### substation
+ds <- data.frame()
+  for(k in 1:2){
+    for(j in 1:length(buffers)){
+      for(m in 1:4){
+        num <- c(2,3,6,8)
+        
+        vr = vrn[1:num[m]]
+        
+        # Create the formula dynamically
+        mod <- as.formula(paste("Host ~", paste(vr, collapse = " + ")))
+        
+        dat <- ah_s %>% 
+          filter(population > 0) %>% 
+          filter(Area == area[k]) %>%
+          filter(Buff == buffers[j]) %>%
+          mutate(POPDEN = log(POPDEN)) %>% 
+          dplyr::select(relevant_variables_demographics, Host) %>%
+          mutate(across(where(is.numeric) & !c("Host"), ~ scale(.))) %>% 
+          mutate(Host = ifelse(Host == "N", 0, 1))
+        
+        
+        fit <- glm(mod, family = binomial(link="logit"), data = dat)
+        
+        dat <- summary(fit)$coefficients %>% 
+          as.data.frame() %>% 
+          mutate(color = ifelse(`Pr(>|z|)` < 0.05, "Y", "N")) %>%
+          dplyr::select(-"z value",-"Pr(>|z|)") %>% 
+          tibble::rownames_to_column("var") %>% 
+          filter(!var == "(Intercept)") %>% 
+          rename(se = "Std. Error",
+                 pe = Estimate) %>% 
+          mutate(Buffer = paste0(buffers[j], " mile"),
+                 Area = area[k],
+                 var = factor(var, levels = c(relevant_variables_demographics)),
+                 model = paste0("Model ",m))
+        
+        ds <- rbind(dat, ds)
+        
+      }
+      
+    }
+  }
+  
+
+
+
+### transmission
+dt <- data.frame()
+  for(k in 1:2){
+    for(j in 1:length(buffers)){
+      for(m in 1:4){
+        num <- c(2,3,6,8)
+        
+        vr = vrn[1:num[m]]
+        
+        # Create the formula dynamically
+        mod <- as.formula(paste("Host ~", paste(vr, collapse = " + ")))
+        
+        dat <- ah_t %>% 
+          filter(population > 0) %>% 
+          filter(Area == area[k]) %>%
+          filter(Buff == buffers[j]) %>%
+          mutate(POPDEN = log(POPDEN)) %>% 
+          dplyr::select(relevant_variables_demographics, Host) %>%
+          mutate(across(where(is.numeric) & !c("Host"), ~ scale(.))) %>% 
+          mutate(Host = ifelse(Host == "N", 0, 1))
+        
+        
+        fit <- glm(mod, family = binomial(link="logit"), data = dat)
+        
+        dat <- summary(fit)$coefficients %>% 
+          as.data.frame() %>% 
+          mutate(color = ifelse(`Pr(>|z|)` < 0.05, "Y", "N")) %>%
+          dplyr::select(-"z value",-"Pr(>|z|)") %>% 
+          tibble::rownames_to_column("var") %>% 
+          filter(!var == "(Intercept)") %>% 
+          rename(se = "Std. Error",
+                 pe = Estimate) %>% 
+          mutate(Buffer = paste0(buffers[j], " mile"),
+                 Area = area[k],
+                 var = factor(var, levels = c(relevant_variables_demographics)),
+                 model = paste0("Model ",m))
+        
+        dt <- rbind(dat, dt)
+        
+      }
+      
+    }
+  }
+  
+
+dds <- ds %>% 
+  mutate(sig = ifelse(color == "Y" & pe > 0, "psig", 
+                      ifelse(color == "Y" & pe < 0, "nsig", "no"))) %>% 
+  group_by(var) %>% 
+  summarise(
+    psig = sum(sig == "psig"),
+    nsig = sum(sig == "nsig"),
+    no   = sum(sig == "no")
+  ) %>% 
+  mutate(total = psig+nsig+no,
+         percent = (psig+nsig)/total*100) 
+
+
+ddt <- dt %>% 
+  mutate(sig = ifelse(color == "Y" & pe > 0, "psig", 
+                      ifelse(color == "Y" & pe < 0, "nsig", "no"))) %>% 
+  group_by(var) %>% 
+  summarise(
+    psig = sum(sig == "psig"),
+    nsig = sum(sig == "nsig"),
+    no   = sum(sig == "no")
+  ) %>% 
+  mutate(total = psig+nsig+no,
+         percent = (psig+nsig)/total*100) 
+
+
+dd <- d %>% 
+  mutate(sig = ifelse(color == "Y" & pe > 0, "psig", 
+                      ifelse(color == "Y" & pe < 0, "nsig", "no"))) %>% 
+  group_by(Group,var) %>% 
+  summarise(
+    psig = sum(sig == "psig"),
+    nsig = sum(sig == "nsig"),
+    no   = sum(sig == "no")
+  ) %>% 
+  mutate(total = psig+nsig+no,
+         percent = (psig+nsig)/total*100) %>% 
+  rbind(dds %>% 
+          mutate(Group = "Substations"),
+        ddt %>% 
+          mutate(Group = "Transmission")) %>% 
+  mutate(Group = factor(Group, levels = group))
+
+t1 <- dd %>% 
+  mutate(Group = factor(Group, levels = group)) %>% 
+  dplyr::select(Group, var, psig, total) %>% 
+  pivot_wider(names_from = Group, values_from = psig) %>% 
+  mutate(var = ifelse(var == "LOWINCOME", "Low\nincome",
+                      ifelse(var == "LESSHS", "Less than\nhigh school\neducation",
+                             ifelse(var == "PEOPCOLOR", "People of\ncolor",
+                                    ifelse(var == "LINGISO", "Difficulty with\nEnglish",
+                                           ifelse(var == "UNEMPLOYED", "Unemployed",
+                                                  ifelse(var == "UNDER5", "Under 5\nyears old",
+                                                         ifelse(var == "OVER64", "Over 64\nyears old",
+                                                                "Population\ndensity")))))))) %>% 
+  dplyr::select(var, all_of(group), total, -Others)
+
+t2 <- dd %>% 
+  mutate(Group = factor(Group, levels = group)) %>% 
+  dplyr::select(Group, var, nsig, total) %>% 
+  pivot_wider(names_from = Group, values_from = nsig) %>% 
+  mutate(var = ifelse(var == "LOWINCOME", "Low\nincome",
+                      ifelse(var == "LESSHS", "Less than\nhigh school\neducation",
+                             ifelse(var == "PEOPCOLOR", "People of\ncolor",
+                                    ifelse(var == "LINGISO", "Difficulty with\nEnglish",
+                                           ifelse(var == "UNEMPLOYED", "Unemployed",
+                                                  ifelse(var == "UNDER5", "Under 5\nyears old",
+                                                         ifelse(var == "OVER64", "Over 64\nyears old",
+                                                                "Population\ndensity")))))))) %>% 
+  dplyr::select(var, all_of(group), total, -Others)
+
+
+t3 <- dd %>% 
+  mutate(Group = factor(Group, levels = group)) %>% 
+  dplyr::select(Group, var, percent, total) %>% 
+  pivot_wider(names_from = Group, values_from = percent) %>% 
+  mutate(var = ifelse(var == "LOWINCOME", "Low\nincome",
+                      ifelse(var == "LESSHS", "Less than\nhigh school\neducation",
+                             ifelse(var == "PEOPCOLOR", "People of\ncolor",
+                                    ifelse(var == "LINGISO", "Difficulty with\nEnglish",
+                                           ifelse(var == "UNEMPLOYED", "Unemployed",
+                                                  ifelse(var == "UNDER5", "Under 5\nyears old",
+                                                         ifelse(var == "OVER64", "Over 64\nyears old",
+                                                                "Population\ndensity")))))))) %>% 
+  dplyr::select(var, all_of(group), total, -Others)
+
+
+
+
+dfs <- list(df1 = t1, df2 = t2, df3 = t3)
+
+lapply(names(dfs), function(nm) {
+  write_csv(dfs[[nm]], paste0("./data/", nm, ".csv"))
+})
+
+
+# Convert to long format for easier processing
+df_pos  <- t1 %>% pivot_longer(-var, names_to = "Impact", values_to = "pos")
+df_neg  <- t2 %>% pivot_longer(-var, names_to = "Impact", values_to = "neg")
+df_pct  <- t3 %>% pivot_longer(-var, names_to = "Impact", values_to = "pct_pos")
+
+# Merge all three
+df_all <- df_pos %>%
+  left_join(df_neg, by = c("var", "Impact")) %>%
+  left_join(df_pct, by = c("var", "Impact")) %>% 
+  filter(Impact != "total")
+
+# Classification function
+classify <- function(psig, nsig, no, total, percent) {
+  
+  # no significant evidence
+  if (percent < 25) return("—")
+  
+  pos_share <- psig / total
+  neg_share <- nsig / total
+  
+  # direction flips
+  if (psig > 0 & nsig > 0) return("±")
+  
+  # strong positive
+  if (pos_share >= 0.75) return("↑↑")
+  
+  # moderate positive
+  if (pos_share >= 0.25) return("↑")
+  
+  # strong negative
+  if (neg_share >= 0.75) return("↓↓")
+  
+  # moderate negative
+  if (neg_share >= 0.25) return("↓")
+  
+  # otherwise no evidence
+  return("—")
+}
+
+# apply classification to your dataset (call it df)
+df_classified <- dd %>%
+  mutate(
+    Classification = pmap_chr(
+      list(psig, nsig, no, total, percent),
+      classify
+    )
+  )
+
+cl <- df_classified %>% 
+  dplyr::select(Group, var, Classification) %>% 
+  pivot_wider(names_from = Group, values_from = Classification) %>% 
+  mutate(var = ifelse(var == "LOWINCOME", "Low\nincome",
+                      ifelse(var == "LESSHS", "Less than\nhigh school\neducation",
+                             ifelse(var == "PEOPCOLOR", "People of\ncolor",
+                                    ifelse(var == "LINGISO", "Difficulty with\nEnglish",
+                                           ifelse(var == "UNEMPLOYED", "Unemployed",
+                                                  ifelse(var == "UNDER5", "Under 5\nyears old",
+                                                         ifelse(var == "OVER64", "Over 64\nyears old",
+                                                                "Population\ndensity")))))))) %>% 
+  dplyr::select(var, all_of(group), -Others)
+  
+
+write_csv(cl, "./data/cl.csv")
 
 
 TP_g <- data.frame()
