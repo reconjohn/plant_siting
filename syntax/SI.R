@@ -1100,32 +1100,32 @@ plt <- d %>%
   mutate_if(is.numeric, ~ . * 100) %>% 
   mutate(Group = factor(Group, levels = group),
          Area = factor(Area, levels = c("Tract","County"))) %>% 
-  gather(key, value, Accuracy:Specificity) %>% 
-  group_by(Group, Buffer, Area, key) %>% 
-  summarise(mean = mean(value),
-            lower = quantile(value, prob = 0.025),
-            upper = quantile(value, prob = 0.975)) %>% 
+  group_by(Group, Buffer, Area) %>% 
+  summarise(mean = mean(Accuracy),
+            lower = quantile(Accuracy, prob = 0.025),
+            upper = quantile(Accuracy, prob = 0.975)) %>% 
   mutate(Total = 1) %>% 
   mutate(Buffer = paste0(Buffer," mile")) %>% 
+  filter(Group != "Others") %>% 
   
-  ggplot(aes(x = mean, y = key, xmin=lower, xmax=upper)) +
-  geom_col(aes(x = Total, y = key), fill = "gray", position = "dodge", width = 0.9) +
-  geom_col(fill = "cornflowerblue", position = "dodge", width = 0.9, alpha = 0.5) +
+  ggplot(aes(y = mean, x = Group, ymin=lower, ymax=upper, fill = Buffer)) +
+  geom_col(aes(y = Total, x = Group), fill = "gray", position = "dodge", width = 0.9) +
+  geom_col(position = "dodge", width = 0.9, alpha = 0.5) +
   geom_errorbar(width=0.4, colour="black", alpha=0.9, size=0.7, position=position_dodge(.9)) +
   
-  labs(x = "Performance (%)", y = "", fill = "", title = "Cross validation perfermance") + 
+  labs(x = "Balanced Accuracy (%)", y = "", fill = "", title = "Cross validation perfermance") + 
   scale_fill_viridis_d(begin = 0.2, end = 0.95) +
-  facet_grid(Area+Buffer~Group, scales = "free", space = "free") +
-  scale_x_continuous(breaks = c(0, 30, 60, 90)) +
+  facet_wrap(~Area, nrow = 6) +
+  scale_y_continuous(breaks = c(0, 30, 60, 90)) +
   theme_classic() +
   theme(panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank(),
         strip.background =element_rect(fill="gray22",color="gray22"),
-        strip.text = element_text(color = 'white',family="Franklin Gothic Book",size=9),
-        legend.position = "none",
-        axis.text.x = element_text(color = "black",family="Franklin Gothic Book",size=9),
-        axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=9),
-        axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=10),
+        strip.text = element_text(color = 'white',family="Franklin Gothic Book",size=12, face = "bold"),
+        legend.position = "bottom",
+        axis.text.x = element_text(angle = 40, hjust = 1, color = "black",family="Franklin Gothic Book",size=12),
+        axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=12),
+        axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=12),
         plot.title=element_text(family="Franklin Gothic Demi", size=20)) 
 
-ggsave("./fig/accuracy.png", plt, width = 12, height = 6)
+ggsave("./fig/accuracy.png", plt, width = 12, height = 8)
