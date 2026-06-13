@@ -727,17 +727,17 @@ rg_t <- TP %>%
                                                                 "Population\ndensity\n(100 ppsm)"))))))),
          var = factor(var, levels = c("Population\ndensity\n(100 ppsm)", setdiff(vec, "Population\ndensity\n(100 ppsm)")))) %>%
   
-  ggplot(aes(x = exp(pe), y = inter, color = inter, fill = Sig)) +
-  geom_vline(xintercept = 1,linetype = "dashed", size = 0.5, color = "gray30") +
-  geom_errorbar(aes(xmin=exp(pe-1.96*se), xmax=exp(pe+1.96*se)), width = 0.3, position = position_dodge(width = 0.9),
+  ggplot(aes(x = pe, y = inter, color = inter, fill = Sig)) +
+  geom_vline(xintercept = 0,linetype = "dashed", size = 0.5, color = "gray30") +
+  geom_errorbar(aes(xmin=pe-1.96*se, xmax=pe+1.96*se), width = 0.3, position = position_dodge(width = 0.9),
                 show.legend = FALSE) +
   geom_point(size = 2,pch=21, position = position_dodge(width = 0.9)) +
   theme_minimal() +
   
   facet_grid(var ~Group, scales = "free", switch = "y") +
   
-  scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
-                labels = trans_format("log10", function(x) sprintf("%.1f", x))) +
+  # scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+  #               labels = trans_format("log10", function(x) sprintf("%.1f", x))) +
   labs(x = "Odds ratio (log scale)", y ="", 
        title = "",fill = "", color = "") +
   
@@ -749,11 +749,11 @@ rg_t <- TP %>%
   scale_fill_manual(values=c("gold2", "white")) +
   
   theme(panel.grid.minor = element_blank(),
-        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_blank(),
         panel.background = element_rect(fill = "white", colour = "grey50"),
         strip.text = element_text(color = 'black',family="Franklin Gothic Book",size=9,face = "bold"),
         legend.position = "bottom",
-        axis.text.x = element_text(color = "black",family="Franklin Gothic Book",size=5),
+        axis.text.x = element_text(color = "black",family="Franklin Gothic Book",size=8, angle = 40, hjust = 1),
         axis.text.y = element_blank(),
         axis.ticks = element_blank(),
         axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=11),
